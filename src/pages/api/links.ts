@@ -12,7 +12,6 @@ const postRequestHeaders = z.object({
 	'content-type': z.literal('application/json'),
 });
 const postRequestBody = z.object({
-	title: z.string(),
 	link: z.string(),
 });
 
@@ -85,25 +84,28 @@ export default makeHandler('/api/links', {
 			try {
 				const metadata = await getMetaData(body.link);
 
-				console.log(metadata);
+				if (!metadata) throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
 
-				// const result = await db
-				// 	.insertInto('link')
-				// 	.values({
-				// 		title: body.title,
-				// 		link: body.link,
-				// 	})
-				// 	.returning('id')
-				// 	.executeTakeFirst();
+				const result = await db
+					.insertInto('link')
+					.values({
+						title: metadata.title || '',
+						link: metadata.url || body.link,
+						description: metadata.description || '',
+						icon: metadata.icon || '',
+						image: metadata.image || '',
+					})
+					.returning('id')
+					.executeTakeFirst();
 
-				// if (!result) throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
+				if (!result) throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
 
 				return {
 					headers: {
 						'content-type': 'application/json',
 					},
 					body: {
-						id: 0,
+						id: result.id,
 					},
 				};
 			} catch (e) {
