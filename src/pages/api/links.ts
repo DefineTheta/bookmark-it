@@ -3,6 +3,7 @@ import { Link } from '@/schema/Link';
 import { is } from '@/util/next-rest';
 import { ServerError, makeHandler } from '@theta-cubed/next-rest/server';
 import { StatusCodes } from 'http-status-codes';
+import getMetaData from 'metadata-scraper';
 import { z } from 'zod';
 
 const getRequestHeaders = z.object({});
@@ -35,7 +36,7 @@ type PostReponseBody = {
 
 declare module '@theta-cubed/next-rest' {
 	interface API {
-		'/api/link': Route<{
+		'/api/links': Route<{
 			GET: {
 				request: {
 					headers: GetRequestHeaders;
@@ -60,7 +61,7 @@ declare module '@theta-cubed/next-rest' {
 	}
 }
 
-export default makeHandler('/api/link', {
+export default makeHandler('/api/links', {
 	GET: {
 		headers: is(getRequestHeaders),
 		body: is(getRequestBody),
@@ -82,23 +83,27 @@ export default makeHandler('/api/link', {
 		body: is(postRequestBody),
 		exec: async ({ body }) => {
 			try {
-				const result = await db
-					.insertInto('link')
-					.values({
-						title: body.title,
-						link: body.link,
-					})
-					.returning('id')
-					.executeTakeFirst();
+				const metadata = await getMetaData(body.link);
 
-				if (!result) throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
+				console.log(metadata);
+
+				// const result = await db
+				// 	.insertInto('link')
+				// 	.values({
+				// 		title: body.title,
+				// 		link: body.link,
+				// 	})
+				// 	.returning('id')
+				// 	.executeTakeFirst();
+
+				// if (!result) throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
 
 				return {
 					headers: {
 						'content-type': 'application/json',
 					},
 					body: {
-						id: result.id,
+						id: 0,
 					},
 				};
 			} catch (e) {
