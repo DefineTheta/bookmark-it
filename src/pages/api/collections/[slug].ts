@@ -1,6 +1,5 @@
 import { db } from '@/db';
-import { Collection, collectionSchema } from '@/schema/Collection';
-import { Link } from '@/schema/Link';
+import { Collection, MinifiedCollection, collectionSchema } from '@/schema/Collection';
 import { is } from '@/util/next-rest';
 import { ServerError, makeHandler } from '@theta-cubed/next-rest/server';
 import { StatusCodes } from 'http-status-codes';
@@ -32,15 +31,13 @@ type GetResponseHeaders = {
 	'content-type': 'application/json';
 };
 type GetResponseBody = {
-	collection: Collection;
+	collection: MinifiedCollection | Collection;
 };
 
 type PatchResponseHeaders = {
 	'content-type': 'application/json';
 };
-type PatchResponseBody = {
-	collection: Collection;
-};
+type PatchResponseBody = {};
 
 type DeleteResponseHeaders = {
 	'content-type': 'application/json';
@@ -49,7 +46,7 @@ type DeleteResponseBody = {};
 
 declare module '@theta-cubed/next-rest' {
 	interface API {
-		'/api/collections/[slug]': Route<{
+		'/api/collections/[slug]?{minified}': Route<{
 			GET: {
 				request: {
 					headers: GetRequestHeaders;
@@ -84,62 +81,93 @@ declare module '@theta-cubed/next-rest' {
 	}
 }
 
-export default makeHandler('/api/collections/[slug]', {
+export default makeHandler('/api/collections/[slug]?{minified}', {
 	GET: {
 		headers: is(getRequestHeaders),
 		body: is(getRequestBody),
 		exec: async ({ params }) => {
 			try {
-				const collectionData = await db
-					.selectFrom('collection')
-					.innerJoin('collection_links as cl', 'collection.id', 'cl.collection_id')
-					.innerJoin('link', 'cl.link_id', 'link.id')
-					.where('collection.id', '=', Number(params.slug))
-					.select([
-						'collection.id as collection_id',
-						'collection.name as collection_name',
-						'collection.description as collection_description',
-						'link.id as link_id',
-						'link.icon as link_icon',
-						'link.description as link_description',
-						'link.title as link_title',
-						'link.image as link_image',
-						'link.link as link',
-					])
-					.execute();
+				const collectionId = Number(params.slug);
+				const minified = Boolean(params.minified);
 
-				if (collectionData.length === 0) throw new ServerError(StatusCodes.NOT_FOUND);
+				if (minified) {
+					const collection = await db
+						.selectFrom('collection')
+						.where('id', '=', collectionId)
+						.selectAll()
+						.executeTakeFirst();
 
-				const collection: Collection = {
-					id: collectionData[0].collection_id,
-					name: collectionData[0].collection_name,
-					description: collectionData[0].collection_description || '',
-					links: collectionData.reduce((links: Link[], linkData) => {
-						links.push({
-							id: linkData.link_id,
-							icon: linkData.link_icon,
-							description: linkData.link_description,
-							title: linkData.link_title,
-							image: linkData.link_image,
-							link: linkData.link,
-						});
+					if (!collection) throw new ServerError(StatusCodes.NOT_FOUND);
 
-						return links;
-					}, []),
-				};
+					return {
+						headers: {
+							'content-type': 'application/json',
+						},
+						body: {
+							collection,
+						},
+					};
+				} else {
+					const collectionData = await db
+						.selectFrom('collection')
+						.leftJoin('collection_links as cl', 'collection.id', 'cl.collection_id')
+						.leftJoin('link', 'cl.link_id', 'link.id')
+						.where('collection.id', '=', collectionId)
+						.select([
+							'collection.id as collection_id',
+							'collection.name as collection_name',
+							'collection.description as collection_description',
+							'link.id as link_id',
+							'link.icon as link_icon',
+							'link.description as link_description',
+							'link.title as link_title',
+							'link.image as link_image',
+							'link.link as link',
+						])
+						.execute();
 
-				return {
-					headers: {
-						'content-type': 'application/json',
-					},
-					body: {
-						collection,
-					},
-				};
-			} catch (e) {
-				console.error(e);
+					if (collectionData.length === 0) throw new ServerError(StatusCodes.NOT_FOUND);
 
-				if (e instanceof ServerError) throw e;
+					const collection: Collection = {
+						id: collectionData[0].collection_id,
+						name: collectionData[0].collection_name,
+						description: collectionData[0].collection_description || '',
+						links: [],
+					};
+
+					collectionData.forEach((data) => {
+						if (
+							data.link_id &&
+							data.link_icon &&
+							data.link_description &&
+							data.link_title &&
+							data.link_image &&
+							data.link
+						) {
+							collection.links.push({
+								id: data.link_id,
+								icon: data.link_icon,
+								description: data.link_description,
+								title: data.link_title,
+								image: data.link_image,
+								link: data.link,
+							});
+						}
+					});
+
+					return {
+						headers: {
+							'content-type': 'application/json',
+						},
+						body: {
+							collection,
+						},
+					};
+				}
+			} catch (err) {
+				console.error(err);
+
+				if (err instanceof ServerError) throw err;
 
 				throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
 			}
@@ -148,7 +176,30 @@ export default makeHandler('/api/collections/[slug]', {
 	PATCH: {
 		headers: is(patchRequestHeaders),
 		body: is(patchRequestBody),
-		exec: async ({ params }) => {},
+		exec: async ({ params, body }) => {
+			try {
+				const collectionId = Number(params.slug);
+
+				const result = await db
+					.updateTable('collection')
+					.set(body)
+					.where('id', '=', collectionId)
+					.executeTakeFirstOrThrow();
+
+				return {
+					headers: {
+						'content-type': 'application/json',
+					},
+					body: {},
+				};
+			} catch (err) {
+				console.error(err);
+
+				if (err instanceof ServerError) throw err;
+
+				throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
+			}
+		},
 	},
 	DELETE: {
 		headers: is(deleteRequestHeaders),
