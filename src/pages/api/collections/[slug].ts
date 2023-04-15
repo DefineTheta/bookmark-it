@@ -153,6 +153,28 @@ export default makeHandler('/api/collections/[slug]', {
 	DELETE: {
 		headers: is(deleteRequestHeaders),
 		body: is(deleteRequestBody),
-		exec: async ({}) => {},
+		exec: async ({ params }) => {
+			try {
+				const collectionId = Number(params.slug);
+
+				const result = await db
+					.deleteFrom('collection')
+					.where('id', '=', collectionId)
+					.executeTakeFirstOrThrow();
+
+				return {
+					headers: {
+						'content-type': 'application/json',
+					},
+					body: {},
+				};
+			} catch (err) {
+				console.error(err);
+
+				if (err instanceof ServerError) throw err;
+
+				throw new ServerError(StatusCodes.INTERNAL_SERVER_ERROR);
+			}
+		},
 	},
 });

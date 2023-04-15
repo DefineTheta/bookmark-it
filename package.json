@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "migrate": "ts-node --esm src/db/migrate.mts"
+    "migrate": "ts-node --esm src/db/migrate.mts",
+    "migrate:down": "ts-node --esm src/db/migrateDown.mts"
   },
   "dependencies": {
     "@theta-cubed/next-rest": "^0.1.2",

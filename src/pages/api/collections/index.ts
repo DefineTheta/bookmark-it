@@ -85,8 +85,8 @@ export default makeHandler('/api/collections?{minified}', {
 				} else {
 					const collectionData = await db
 						.selectFrom('collection')
-						.innerJoin('collection_links as cl', 'collection.id', 'cl.collection_id')
-						.innerJoin('link', 'cl.link_id', 'link.id')
+						.leftJoin('collection_links as cl', 'collection.id', 'cl.collection_id')
+						.leftJoin('link', 'cl.link_id', 'link.id')
 						.select([
 							'collection.id as collection_id',
 							'collection.name as collection_name',
@@ -112,14 +112,23 @@ export default makeHandler('/api/collections?{minified}', {
 							};
 						}
 
-						collectionMap[data.collection_id].links.push({
-							id: data.link_id,
-							icon: data.link_icon,
-							description: data.link_description,
-							title: data.link_title,
-							image: data.link_image,
-							link: data.link,
-						});
+						if (
+							data.link_id &&
+							data.link_icon &&
+							data.link_description &&
+							data.link_title &&
+							data.link_image &&
+							data.link
+						) {
+							collectionMap[data.collection_id].links.push({
+								id: data.link_id,
+								icon: data.link_icon,
+								description: data.link_description,
+								title: data.link_title,
+								image: data.link_image,
+								link: data.link,
+							});
+						}
 					});
 
 					return {

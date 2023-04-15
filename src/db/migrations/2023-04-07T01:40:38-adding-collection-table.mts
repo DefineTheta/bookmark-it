@@ -10,13 +10,17 @@ export const up = async (db: Kysely<any>) => {
 
 	await db.schema
 		.createTable('collection_links')
-		.addColumn('collection_id', 'integer', (col) => col.references('collection.id'))
-		.addColumn('link_id', 'integer', (col) => col.references('link.id'))
+		.addColumn('collection_id', 'integer', (col) =>
+			col.references('collection.id').onDelete('cascade')
+		)
+		.addColumn('link_id', 'integer', (col) =>
+			col.references('link.id').onDelete('cascade')
+		)
 		.addPrimaryKeyConstraint('collection_links_pk', ['collection_id', 'link_id'])
 		.execute();
 };
 
 export const down = async (db: Kysely<any>) => {
-	await db.schema.dropTable('collection').execute();
 	await db.schema.dropTable('collection_links').execute();
+	await db.schema.dropTable('collection').execute();
 };
